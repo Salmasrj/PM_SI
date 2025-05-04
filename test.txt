@@ -1,0 +1,64 @@
+# ActionVenteAchat :
+    Message=""
+    Si operation et Vehicule ne sont pas vide et ont des valeurs correctes :
+        Si c'est un achat : 
+            Si c'est une voiture occasion :
+                Si Capacite[0] est inferieur à 1:
+                    pos1 = 0
+                    CreaMessageModifCapAjout(Capacite, Message, Vehicule, pos1)
+                Else : 
+                    pos2 = "parc"
+                    PasDespace( pos2,Message)
+            Else :
+                Si Capacite[1] est inferieur à 1:
+                    pos1 = 1
+                    CreaMessageModifCapAjout(Capacite, Message, Vehicule, pos1)
+                Else : 
+                    pos2 = "showroom"
+                    PasDespace( pos2,Message)
+        Else : 
+            Si l'emplacement du vehicule est le parc :
+                pos3 = 0
+                SuppressionDuVehicule(BddVehicule, pos3, Message) 
+            Else : 
+                pos3 = 1
+                SuppressionDuVehicule(pos3, Message) 
+            Si la variable Message est vide : 
+                Message = "Vehicule introuvable dans la base de donnees. Contactez un superieur" 
+    Else : 
+        Message = "Les valeurs entrées sont incorrectes ou incompletes"
+return Message
+
+#CreaMessageModifCapAjout (Message, pos1, Vehicule)
+    Si Capacite[pos1] > 0,8 : 
+        Message = "Espace presque rempli, vehicule ajouté"
+    Else : 
+        Message = "Vehicule ajouté"
+    Capacite[pos1] += 1
+    Capacite[pos1+2] = Capacite[pos1+2] * (Capacite[pos1]-1) / Capacite[pos1]
+    ajouter vehicule à la bdd data.csv
+return Message
+
+
+
+# PasDespace(pos2,Message)
+    Message = "Erreur pas d'espace"
+    compt = 0
+    Tant que compt < NombreVehicules:
+        Si dans la bdd il y a un vehicule qui a une valeur : Jours avant sortie du stock < 7 et vehicule d'occasion 
+            Message = Message + "Place liberable dans la semaine"
+            Exit boucle
+        compt += 1
+    compt = 0
+return Message
+
+#SuppressionDuVehicule(pos3, Message) 
+compt = 0 
+    Tant que compt < 0 : 
+        Si vehicule[ID] == Bdd [compt] [ID]
+            retirer le Vehicule de la bdd
+            Message = "Le vehicule a été retirer de la base de données"
+            Capacite[pos3] = Capacite[pos3] - 1
+            Capacite[pos3+2] = Capacite[pos3+2] * (Capacite[pos3]+1) / Capacite[pos3]
+        compt = compt +1
+return Message

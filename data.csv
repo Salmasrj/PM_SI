@@ -1,0 +1,6 @@
+ID, Marque,Model,Année,État,ValeurEntrée,Emplacement,Statut,Jours avant sortie du stock,Kilométrage,Pièces,ValeurSortie
+PM1881919,Toyota,Corolla,2020,occasion,20000,parc,en stock,,15000,"[{""nom_pièce"": ""Moteur"", ""importance_pièce"": 5}, {""nom_pièce"": ""Freins"", ""importance_pièce"": 4}]",25000
+PM3737377,Honda,Civic,2019,neuf,22000,showroom,en stock,,20000,"[{""nom_pièce"": ""Transmission"", ""importance_pièce"": 5}, {""nom_pièce"": ""Pneus"", ""importance_pièce"": 3}]",27000
+PM2622829,Ford,Mustang,2021,neuf,30000,showroom,en stock,,10000,"[{""nom_pièce"": ""Suspension"", ""importance_pièce"": 4}, {""nom_pièce"": ""Échappement"", ""importance_pièce"": 3}]",35000
+PM1923721,Chevrolet,Malibu,2018,occasion,18000,parc,vendu,4,50000,"[{""nom_pièce"": ""Moteur"", ""importance_pièce"": 5}, {""nom_pièce"": ""Carrosserie"", ""importance_pièce"": 2}]",20000
+PM2819289,Nissan,Altima,2022,neuf,25000,showroom,en stock,,5000,"[{""nom_pièce"": ""Phares"", ""importance_pièce"": 3}, {""nom_pièce"": ""Freins"", ""importance_pièce"": 4}]",30000
