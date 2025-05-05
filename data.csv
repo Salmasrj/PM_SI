@@ -129,4 +129,3 @@ PM1174,Porsche,911 Dakar,2023,neuf,220000.0,parc,en stock,,2500,"[{""nom_pièce"
 PM9448,Mercedes,Classe A,2023,neuf,50000.0,showroom,en stock,,5000,"[{""nom_pièce"": ""Moteur"", ""importance_pièce"": 4}, {""nom_pièce"": ""Transmission"", ""importance_pièce"": 5}]",60000.0,,,,,,,Disponible
 PM8440,Mercedes,Classe A,2023,neuf,50000.0,showroom,en stock,,5000,"[{""nom_pièce"": ""Moteur"", ""importance_pièce"": 2}, {""nom_pièce"": ""Transmission"", ""importance_pièce"": 3}]",60000.0,,,,,,,Disponible
 PM3145,Audi,Q5 GT,2019,neuf,100000.0,showroom,en stock,,5000,"[{""nom_pièce"": ""Moteur"", ""importance_pièce"": 4}, {""nom_pièce"": ""Transmission"", ""importance_pièce"": 5}]",120000.0,,,,,,,Disponible
-PM3110,Lamborghini,Z,2023,neuf,50000.0,parc,en stock,,5000,"[{""nom_pièce"": ""Carrosserie"", ""importance_pièce"": 4}, {""nom_pièce"": ""Moteur"", ""importance_pièce"": 5}]",60000.0,,,,,,Sport,Disponible
