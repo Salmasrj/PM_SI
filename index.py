@@ -1,5 +1,6 @@
 import streamlit as st
 
+
 # PAGE CONFIGURATION MUST BE THE FIRST STREAMLIT COMMAND
 st.set_page_config(
     page_title="Prestige Motors - Gestion de Stock",
@@ -13,11 +14,12 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+import json
 from datetime import datetime, timedelta
 from streamlit_extras.metric_cards import style_metric_cards
 
     # On importe les fonctions de notre page web
-from fonctions import load_stock_data, calculate_summary_metrics
+from fonctions import load_csv_data, calculate_summary_metrics
 
     # On importe le modèle de prédiction de prix de voiture
 from fonctions import CarPricePredictor
@@ -75,10 +77,10 @@ if "filter_status" not in st.session_state:
 if "price_range" not in st.session_state:
     st.session_state.price_range = [0, 1000000]
 if "year_range" not in st.session_state:
-    st.session_state.year_range = [2000, 2025]
+    st.session_state.year_range = [1990, 2025]
 
 # Load data
-stock_data = load_stock_data()
+stock_data = load_csv_data("data.csv")
 summary_metrics = calculate_summary_metrics(stock_data)
 
 
@@ -167,11 +169,18 @@ with tabs[0]:
     
     # Action buttons in the main area
     col1, col2, col3 = st.columns(3)
-    
-    # Remplacer le bouton d'achat actuel par:
 
     with col1:
+        # Initialiser l'état du formulaire d'achat si nécessaire
+        if "show_purchase_form" not in st.session_state:
+            st.session_state.show_purchase_form = False
+        
+        # Bouton pour afficher/masquer le formulaire d'achat
         if st.button("🛒 Achat de véhicule", use_container_width=True):
+            st.session_state.show_purchase_form = True
+        
+        # Afficher le formulaire si l'état est activé
+        if st.session_state.show_purchase_form:
             with st.form("achat_vehicule_form"):
                 st.subheader("Formulaire d'achat de véhicule")
                 
@@ -179,18 +188,18 @@ with tabs[0]:
                 vehicle_type = st.radio("Type de véhicule", ["Neuf", "Occasion"])
                 
                 # Informations de base du véhicule
-                col1, col2 = st.columns(2)
-                with col1:
+                form_col1, form_col2 = st.columns(2)
+                with form_col1:
                     vehicle_id = st.text_input("ID du véhicule", value=f"PM{np.random.randint(1000, 9999)}")
                     brand = st.selectbox("Marque", ["Mercedes", "BMW", "Audi", "Porsche", "Ferrari", "Lamborghini", "Bentley", "Maserati"])
                     model = st.text_input("Modèle")
                     year = st.number_input("Année", min_value=2000, max_value=2025, value=2023)
                 
-                with col2:
+                with form_col2:
                     mileage = st.number_input("Kilométrage", min_value=0, value=5000)
                     purchase_price = st.number_input("Prix d'achat (€)", min_value=0, value=50000)
                     selling_price = st.number_input("Prix de vente estimé (€)", min_value=0, value=int(purchase_price * 1.2))
-                    condition = st.selectbox("État", ["Excellent", "Bon", "Correct"])
+                    condition = st.selectbox("État", ["neuf", "occasion"])
                 
                 # Créer un dictionnaire pour le véhicule
                 vehicle_data = {
@@ -204,14 +213,41 @@ with tabs[0]:
                     "Marge": selling_price - purchase_price,
                     "Date d'achat": datetime.now().strftime('%Y-%m-%d'),
                     "Statut": "En stock",
-                    "Catégorie": "Luxury",  # À déterminer automatiquement selon la marque/modèle
+                    "Catégorie": "Luxury",
                     "État": condition,
-                    "Disponibilité": "Disponible"
+                    "Disponibilité": "Disponible",
+                    "Emplacement": "parc",
+                    # Ajouter ce champ pour les pièces
+                    "Pièces": json.dumps([
+                        {"nom_pièce": "Moteur", "importance_pièce": 3},
+                        {"nom_pièce": "Transmission", "importance_pièce": 3},
+                        {"nom_pièce": "Carrosserie", "importance_pièce": 3}
+                    ])
                 }
                 
-                submit = st.form_submit_button("Confirmer l'achat", use_container_width=True)
+                # Boutons du formulaire
+                btn_col1, btn_col2 = st.columns(2)
+                with btn_col1:
+                    cancel = st.form_submit_button("Annuler", use_container_width=True)
+                    if cancel:
+                        st.session_state.show_purchase_form = False
+                        st.rerun()
                 
+                with btn_col2:
+                    submit = st.form_submit_button("Confirmer l'achat", use_container_width=True)
+                
+                # Traitement après soumission
                 if submit:
+                    # Déterminer la catégorie automatiquement
+                    if brand in ["Ferrari", "Lamborghini", "Porsche"] and not any(suv in model.lower() for suv in ["cayenne", "urus"]):
+                        vehicle_data["Catégorie"] = "Sport"
+                    elif brand in ["Bentley", "Mercedes"] and any(lux in model.lower() for lux in ["classe s", "continental", "flying spur"]):
+                        vehicle_data["Catégorie"] = "Luxury"
+                    elif any(suv in model.lower() for suv in ["gle", "x5", "q7", "cayenne", "urus", "bentayga", "levante"]):
+                        vehicle_data["Catégorie"] = "SUV"
+                    elif any(sedan in model.lower() for sedan in ["classe e", "série 5", "a6", "panamera", "ghibli", "quattroporte"]):
+                        vehicle_data["Catégorie"] = "Sedan"
+                    
                     # Appeler la méthode ActionVenteAchat avec type d'opération "achat"
                     operation = ["achat", vehicle_type.lower()]
                     message = algo_actions.ActionVenteAchat(operation, vehicle_data)
@@ -219,17 +255,23 @@ with tabs[0]:
                     # Afficher le message retourné par la méthode
                     if "ajouté" in message:
                         st.success(message)
+                        # Fermer le formulaire après un achat réussi
+                        st.session_state.show_purchase_form = False
+                        st.rerun()
                     else:
                         st.error(message)
-                    
-                    # Mettre à jour les données
-                    if "ajouté" in message:
-                        st.rerun()
-        
-        # Remplacer le bouton de vente actuel par:
 
     with col2:
+        # Initialiser l'état du formulaire de vente si nécessaire
+        if "show_sale_form" not in st.session_state:
+            st.session_state.show_sale_form = False
+        
+        # Bouton pour afficher/masquer le formulaire de vente
         if st.button("💰 Vente de véhicule", use_container_width=True):
+            st.session_state.show_sale_form = True
+        
+        # Afficher le formulaire si l'état est activé
+        if st.session_state.show_sale_form:
             with st.form("vente_vehicule_form"):
                 st.subheader("Formulaire de vente de véhicule")
                 
@@ -250,19 +292,31 @@ with tabs[0]:
                     # Récupérer toutes les informations du véhicule sélectionné
                     selected_vehicle = vehicles_in_stock[vehicles_in_stock["ID"] == selected_vehicle_id].iloc[0].to_dict()
                     
-                    # Afficher les détails du véhicule
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
+                    # Afficher les détails du véhicule avec une taille de texte réduite
+                    detail_cols = st.columns(3)
+                    with detail_cols[0]:
                         st.metric("Marque", selected_vehicle["Marque"])
                         st.metric("Modèle", selected_vehicle["Modèle"])
                     
-                    with col2:
+                    with detail_cols[1]:
                         st.metric("Année", selected_vehicle["Année"])
                         st.metric("Kilométrage", f"{selected_vehicle['Kilométrage']} km")
                     
-                    with col3:
+                    with detail_cols[2]:
                         st.metric("Prix d'achat", f"{selected_vehicle['Prix d\'achat']} €")
                         st.metric("Prix de vente", f"{selected_vehicle['Prix de vente']} €")
+                    
+                    # CSS pour réduire la taille du texte dans les metrics
+                    st.markdown("""
+                    <style>
+                    [data-testid="stMetricValue"] {
+                        font-size: 1rem !important;
+                    }
+                    [data-testid="stMetricLabel"] {
+                        font-size: 0.8rem !important;
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
                     
                     # Option pour ajuster le prix de vente final
                     final_sale_price = st.number_input(
@@ -278,8 +332,18 @@ with tabs[0]:
                     
                     submit_disabled = False
                 
-                submit = st.form_submit_button("Confirmer la vente", disabled=submit_disabled, use_container_width=True)
+                # Boutons du formulaire
+                col1, col2 = st.columns(2)
+                with col1:
+                    cancel = st.form_submit_button("Annuler", use_container_width=True)
+                    if cancel:
+                        st.session_state.show_sale_form = False
+                        st.rerun()
+                        
+                with col2:
+                    submit = st.form_submit_button("Confirmer la vente", disabled=submit_disabled, use_container_width=True)
                 
+                # Traitement après soumission
                 if submit and not submit_disabled:
                     # Appeler la méthode ActionVenteAchat avec type d'opération "vente"
                     operation = ["vente", ""]
@@ -288,17 +352,105 @@ with tabs[0]:
                     # Afficher le message retourné par la méthode
                     if "retiré" in message:
                         st.success(message)
+                        # Fermer le formulaire après une vente réussie
+                        st.session_state.show_sale_form = False
+                        st.rerun()
                     else:
                         st.error(message)
-                    
-                    # Mettre à jour les données
-                    if "retiré" in message:
-                        st.rerun()
     
     with col3:
+        if "show_price_estimation" not in st.session_state:
+            st.session_state.show_price_estimation = False
+            
         if st.button("💹 Estimation de prix", use_container_width=True):
-            estimate_price(st.session_state.price_predictor)
-    
+            st.session_state.show_price_estimation = True
+        
+        # Afficher l'interface d'estimation si le bouton a été cliqué
+        if st.session_state.show_price_estimation:
+            st.subheader("💹 Estimation du prix d'un véhicule")
+            
+            # Créer une interface sans utiliser de formulaire
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                annee = st.number_input("Année du véhicule", min_value=2000, max_value=2030, value=2023)
+                valeur_entree = st.number_input("Prix d'achat (€)", min_value=0, value=50000, step=1000)
+            
+            with col2:
+                kilometrage = st.number_input("Kilométrage", min_value=0, value=5000, step=1000)
+                marque = st.selectbox("Marque", options=["Mercedes", "BMW", "Audi", "Porsche", "Ferrari", "Lamborghini", "Bentley", "Maserati"])
+            
+            st.subheader("État des pièces et composants")
+            st.info("Indiquez l'importance et l'état des pièces principales du véhicule")
+            
+            col1, col2 = st.columns(2)
+            
+            pieces = []
+            unique_pieces = ["Moteur", "Transmission", "Freins", "Suspension", "Carrosserie", "Intérieur", "Électronique"]
+            
+            # Créer des contrôles pour chaque pièce
+            for i, piece in enumerate(unique_pieces):
+                with col1 if i % 2 == 0 else col2:
+                    importance = st.slider(f"Importance de {piece}", 1, 5, 3)
+                    pieces.append({"nom_pièce": piece, "importance_pièce": importance})
+            
+            st.markdown("---")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                cancel = st.button("Annuler", use_container_width=True)
+                if cancel:
+                    st.session_state.show_price_estimation = False
+                    st.rerun()
+            with col2:        
+                if st.button("Calculer l'estimation", use_container_width=True):
+                    try:
+                        estimated_price = st.session_state.price_predictor.predict(
+                            annee, valeur_entree, kilometrage, pieces
+                        )
+                        
+                        # Calculer une fourchette de prix (±5%)
+                        price_min = estimated_price * 0.95
+                        price_max = estimated_price * 1.05
+                        
+                        st.success(f"### Prix estimé: {estimated_price:,.2f} €")
+                        st.info(f"Fourchette de prix recommandée: {price_min:,.2f} € - {price_max:,.2f} €")
+                        
+                        # Afficher quelques métriques supplémentaires
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            marge = estimated_price - valeur_entree
+                            marge_percent = (marge / valeur_entree) * 100 if valeur_entree > 0 else 0
+                            st.metric("Marge potentielle", f"{marge:,.2f} €", f"{marge_percent:.1f}%")
+                        
+                        with col2:
+                            marche_actuel = estimated_price * 0.98  # Simuler prix du marché
+                            diff = estimated_price - marche_actuel
+                            diff_percent = (diff / marche_actuel) * 100
+                            st.metric("Comparaison marché", f"{marche_actuel:,.2f} €", f"{diff_percent:.1f}%")
+                        
+                        with col3:
+                            st.metric("Prix au km", f"{estimated_price / kilometrage:.2f} €/km" if kilometrage > 0 else "N/A")
+                        
+                        # Add CSS to reduce text size in metrics
+                        st.markdown("""
+                        <style>
+                        [data-testid="stMetricValue"] {
+                            font-size: 1rem !important;
+                        }
+                        [data-testid="stMetricDelta"] {
+                            font-size: 0.8rem !important;
+                        }
+                        [data-testid="stMetricLabel"] {
+                            font-size: 0.8rem !important;
+                            font-weight: bold !important;
+                        }
+                        </style>
+                        """, unsafe_allow_html=True)
+                    except Exception as e:
+                        st.error(f"Erreur lors de l'estimation du prix: {str(e)}")
+                        st.error("Veuillez vérifier que le modèle a été correctement entraîné avec les données")
+        
     st.markdown("---")
 
     st.markdown("""
@@ -318,7 +470,9 @@ with tabs[0]:
     
     with col2:
         st.metric("Capacité du showroom", f"{Capacite[1]}/60", f"{Capacite[3]:.1f}%")
-        st.progress(Capacite[3]/100)
+        st.progress(min(Capacite[3]/100, 1.0))
+        if Capacite[3] > 100:
+            st.warning(f"⚠️ Showroom en surcapacité: {Capacite[3]:.1f}%")
     
     with col3:
         st.metric("Prix moyen", f"{summary_metrics['avg_price']:,.0f} €", delta=None, delta_color="normal", help=None, label_visibility="visible")
@@ -418,10 +572,24 @@ with tabs[1]:
     col1, col2, col3 = st.columns([1, 1, 2])
     
     with col1:
-        st.button("✏️ Modifier", use_container_width=True)
+        if st.button("✏️ Modifier", use_container_width=True):
+            st.info("Sélectionnez un véhicule dans le tableau puis modifiez ses informations")
     
     with col2:
-        st.button("❌ Supprimer", use_container_width=True)
+        if st.button("❌ Supprimer", use_container_width=True):
+            st.warning("Sélectionnez un véhicule dans le tableau pour le supprimer")
+            with st.expander("Confirmation de suppression"):
+                vehicle_to_delete = st.selectbox(
+                    "Choisir le véhicule à supprimer",
+                    options=filtered_data["ID"].tolist(),
+                    format_func=lambda x: f"{x} - {filtered_data[filtered_data['ID'] == x]['Marque'].iloc[0]} {filtered_data[filtered_data['ID'] == x]['Modèle'].iloc[0]}"
+                )
+                if st.button("Confirmer la suppression", type="primary"):
+                    # Appeler la méthode de suppression avec l'ID sélectionné
+                    vehicle_to_remove = filtered_data[filtered_data["ID"] == vehicle_to_delete].iloc[0].to_dict()
+                    message = algo_actions.ActionVenteAchat(["vente", ""], vehicle_to_remove)
+                    st.success(message)
+                    st.rerun()
     
     with col3:
         search_query = st.text_input("Rechercher un véhicule", placeholder="Entrez l'ID, la marque ou le modèle")
@@ -435,31 +603,105 @@ with tabs[1]:
         )
         filtered_data = filtered_data[search_filter]
     
-    # Display the data table
-    # Add a selection column
-    filtered_data["Date d'achat"] = pd.to_datetime(filtered_data["Date d'achat"])
-    st.data_editor(
-        filtered_data,
-        hide_index=True,
-        use_container_width=True,
-        column_config={
-            "ID": st.column_config.TextColumn("ID", width="small"),
-            "Marque": st.column_config.TextColumn("Marque", width="medium"),
-            "Modèle": st.column_config.TextColumn("Modèle", width="medium"),
-            "Année": st.column_config.NumberColumn("Année", width="small"),
-            "Kilométrage": st.column_config.NumberColumn("Kilométrage", format="%d km", width="medium"),
-            "Prix d'achat": st.column_config.NumberColumn("Prix d'achat", format="%d €", width="medium"),
-            "Prix de vente": st.column_config.NumberColumn("Prix de vente", format="%d €", width="medium"),
-            "Marge": st.column_config.NumberColumn("Marge", format="%d €", width="medium"),
-            "Date d'achat": st.column_config.DateColumn("Date d'achat", width="medium"),
-            "Statut": st.column_config.SelectboxColumn(
-                "Statut",
+    # Filtres supplémentaires avec des expanders
+    with st.expander("Filtres avancés"):
+        filter_cols = st.columns(4)
+        
+        with filter_cols[0]:
+            status_filter = st.multiselect(
+                "Statut", 
                 options=["En stock", "Réservé", "Vendu"],
-                width="medium"
-            ),
-            "Catégorie": st.column_config.TextColumn("Catégorie", width="medium"),
-            "État": st.column_config.TextColumn("État", width="medium"),
-            "Disponibilité": st.column_config.TextColumn("Disponibilité", width="medium")
-        }
-    )
+                default=[]
+            )
+        
+        with filter_cols[1]:
+            location_filter = st.multiselect(
+                "Emplacement", 
+                options=["parc", "showroom"],
+                default=[]
+            )
+            
+        with filter_cols[2]:
+            min_year = int(filtered_data["Année"].min())
+            max_year = int(filtered_data["Année"].max())
+            year_range = st.slider(
+                "Année", 
+                min_value=min_year, 
+                max_value=max_year,
+                value=(min_year, max_year)
+            )
+            
+        with filter_cols[3]:
+            state_filter = st.multiselect(
+                "État", 
+                options=["neuf", "occasion"],
+                default=[]
+            )
     
+        # Appliquer les filtres avancés
+        if status_filter:
+            filtered_data = filtered_data[filtered_data["Statut"].isin(status_filter)]
+        
+        if location_filter:
+            filtered_data = filtered_data[filtered_data["Emplacement"].isin(location_filter)]
+            
+        if year_range:
+            filtered_data = filtered_data[(filtered_data["Année"] >= year_range[0]) & 
+                                         (filtered_data["Année"] <= year_range[1])]
+            
+        if state_filter:
+            filtered_data = filtered_data[filtered_data["État"].isin(state_filter)]
+    
+    # Configuration pour l'affichage des données
+    try:
+        # Convertir la date en format datetime (si présente)
+        if "Date d'achat" in filtered_data.columns:
+            filtered_data["Date d'achat"] = pd.to_datetime(filtered_data["Date d'achat"])
+        
+        # Afficher le tableau de véhicules
+        edited_data = st.data_editor(
+            filtered_data,
+            hide_index=True,
+            use_container_width=True,
+            column_config={
+                "ID": st.column_config.TextColumn("ID", width="small"),
+                "Marque": st.column_config.TextColumn("Marque", width="medium"),
+                "Modèle": st.column_config.TextColumn("Modèle", width="medium"),
+                "Année": st.column_config.NumberColumn("Année", width="small"),
+                "Kilométrage": st.column_config.NumberColumn("Kilométrage", format="%d km", width="medium"),
+                "Prix d'achat": st.column_config.NumberColumn("Prix d'achat", format="%d €", width="medium"),
+                "Prix de vente": st.column_config.NumberColumn("Prix de vente", format="%d €", width="medium"),
+                "Marge": st.column_config.NumberColumn("Marge", format="%d €", width="medium"),
+                "Date d'achat": st.column_config.DateColumn("Date d'achat", width="medium"),
+                "Statut": st.column_config.SelectboxColumn(
+                    "Statut",
+                    options=["En stock", "Réservé", "Vendu"],
+                    width="medium"
+                ),
+                "Emplacement": st.column_config.SelectboxColumn(
+                    "Emplacement",
+                    options=["parc", "showroom"],
+                    width="medium"
+                ),
+                "État": st.column_config.SelectboxColumn(
+                    "État", 
+                    options=["neuf", "occasion"],
+                    width="medium"
+                ),
+                "Catégorie": st.column_config.TextColumn("Catégorie", width="medium"),
+                "Disponibilité": st.column_config.TextColumn("Disponibilité", width="medium")
+            },
+            num_rows="dynamic"
+        )
+        
+        # Vérifier si des modifications ont été apportées et mettre à jour les données
+        if not edited_data.equals(filtered_data):
+            st.success("Modifications enregistrées!")
+            # Vous pouvez ajouter ici le code pour sauvegarder les modifications dans data.csv
+            
+    except Exception as e:
+        st.error(f"Erreur lors de l'affichage des données: {e}")
+        st.write(filtered_data.head())
+    
+    # Afficher des statistiques sur les résultats
+    st.caption(f"{len(filtered_data)} véhicules affichés sur un total de {len(stock_data)}")
