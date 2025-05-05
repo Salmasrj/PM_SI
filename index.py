@@ -163,6 +163,33 @@ filtered_data = filtered_data[
     (filtered_data["Année"] <= st.session_state.year_range[1])
 ]
 
+# Ajouter après les imports, avant le début des tabs
+# Système de notification global
+if "notification" not in st.session_state:
+    st.session_state.notification = {"type": None, "message": None, "time": None}
+
+# Afficher la notification si elle existe et est récente (moins de 5 secondes)
+if st.session_state.notification["message"]:
+    current_time = datetime.now()
+    notification_time = st.session_state.notification["time"]
+    
+    # Si la notification date de moins de 5 secondes
+    if notification_time and (current_time - notification_time).total_seconds() < 5:
+        # Création d'un conteneur flottant pour la notification
+        st.markdown(
+            f"""
+            <div style="position: fixed; top: 70px; right: 20px; z-index: 1000; 
+                       padding: 10px 20px; background-color: {'#4CAF50' if st.session_state.notification['type'] == 'success' else '#F44336'}; 
+                       color: white; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+                <p style="margin: 0; font-weight: bold;">{st.session_state.notification["message"]}</p>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+    else:
+        # Réinitialiser la notification après 5 secondes
+        st.session_state.notification = {"type": None, "message": None, "time": None}
+
 # Tab 1: Dashboard Overview
 with tabs[0]:
     st.header("📊 Tableau de bord du stock")
@@ -191,40 +218,87 @@ with tabs[0]:
                 form_col1, form_col2 = st.columns(2)
                 with form_col1:
                     vehicle_id = st.text_input("ID du véhicule", value=f"PM{np.random.randint(1000, 9999)}")
-                    brand = st.selectbox("Marque", ["Mercedes", "BMW", "Audi", "Porsche", "Ferrari", "Lamborghini", "Bentley", "Maserati"])
+                    brand = st.selectbox("Marque", ["Mercedes", "BMW", "Audi", "Porsche", "Ferrari", "Lamborghini", "Bentley", "Maserati", "Rimac"])
                     model = st.text_input("Modèle")
                     year = st.number_input("Année", min_value=2000, max_value=2025, value=2023)
                 
                 with form_col2:
                     mileage = st.number_input("Kilométrage", min_value=0, value=5000)
-                    purchase_price = st.number_input("Prix d'achat (€)", min_value=0, value=50000)
-                    selling_price = st.number_input("Prix de vente estimé (€)", min_value=0, value=int(purchase_price * 1.2))
+                    purchase_price = st.number_input("Prix d'achat (€)", min_value=0, value=50000, step=1000)
+                    selling_price = st.number_input("Prix de vente estimé (€)", min_value=0, value=int(purchase_price * 1.2), step=1000)
                     condition = st.selectbox("État", ["neuf", "occasion"])
                 
-                # Créer un dictionnaire pour le véhicule
+                # Emplacement et statut
+                form_col3, form_col4 = st.columns(2)
+                with form_col3:
+                    location = st.selectbox("Emplacement", ["parc", "showroom"], index=0)
+                    status = st.selectbox("Statut", ["en stock", "réservé", "vendu"], index=0)
+                
+                with form_col4:
+                    category = st.selectbox("Catégorie", ["Luxury", "Sport", "SUV", "Sedan", "Other"], index=0)
+                    st.info("La catégorie sera automatiquement ajustée selon la marque et le modèle")
+                
+                # Informations sur les pièces
+                st.subheader("État des pièces et composants")
+                st.info("Sélectionnez deux pièces principales et leur importance")
+                
+                # Liste des pièces disponibles
+                pieces_list = ["Moteur", "Transmission", "Freins", "Suspension", "Carrosserie", "Intérieur", 
+                              "Électronique", "Batterie", "Moteurs électriques", "Aérodynamique"]
+                
+                # Création de deux colonnes pour les sélections
+                pieces_col1, pieces_col2 = st.columns(2)
+                
+                # Première pièce
+                with pieces_col1:
+                    piece1 = st.selectbox("Première pièce importante", pieces_list, key="piece1")
+                    importance1 = st.select_slider(
+                        f"Importance de {piece1}",
+                        options=[1, 2, 3, 4, 5],
+                        value=4,
+                        key="importance1"
+                    )
+                
+                # Deuxième pièce (filtrer pour éviter les doublons)
+                with pieces_col2:
+                    # Créer une liste sans la première pièce sélectionnée
+                    remaining_pieces = [p for p in pieces_list if p != piece1]
+                    piece2 = st.selectbox("Deuxième pièce importante", remaining_pieces, key="piece2")
+                    importance2 = st.select_slider(
+                        f"Importance de {piece2}",
+                        options=[1, 2, 3, 4, 5],
+                        value=5,
+                        key="importance2"
+                    )
+                
+                # Créer les données des pièces
+                pieces_data = [
+                    {"nom_pièce": piece1, "importance_pièce": importance1},
+                    {"nom_pièce": piece2, "importance_pièce": importance2}
+                ]
+                
+                # Créer un dictionnaire pour le véhicule dans le format attendu
                 vehicle_data = {
                     "ID": vehicle_id,
                     "Marque": brand,
-                    "Modèle": model,
+                    "Model": model,  # Utiliser "Model" au lieu de "Modèle"
                     "Année": year,
+                    "État": condition.lower(),
+                    "ValeurEntrée": float(purchase_price),
+                    "Emplacement": location.lower(),
+                    "Statut": status.capitalize(),  # Capitaliser pour cohérence
+                    "Jours avant sortie du stock": "",
                     "Kilométrage": mileage,
-                    "Prix d'achat": purchase_price,
-                    "Prix de vente": selling_price,
-                    "Marge": selling_price - purchase_price,
-                    "Date d'achat": datetime.now().strftime('%Y-%m-%d'),
-                    "Statut": "En stock",
-                    "Catégorie": "Luxury",
-                    "État": condition,
-                    "Disponibilité": "Disponible",
-                    "Emplacement": "parc",
-                    # Ajouter ce champ pour les pièces
-                    "Pièces": json.dumps([
-                        {"nom_pièce": "Moteur", "importance_pièce": 3},
-                        {"nom_pièce": "Transmission", "importance_pièce": 3},
-                        {"nom_pièce": "Carrosserie", "importance_pièce": 3}
-                    ])
+                    "Pièces": json.dumps(pieces_data, ensure_ascii=False),  # ensure_ascii=False pour conserver les accents
+                    "ValeurSortie": float(selling_price),
+                    "Modèle": "",  # Laisser vide
+                    "Prix d'achat": "",  # Laisser vide
+                    "Prix de vente": "",  # Laisser vide
+                    "Marge": "",  # Laisser vide
+                    "Date d'achat": "",  # Laisser vide
+                    "Catégorie": "",
+                    "Disponibilité": "Disponible" if status.lower() == "en stock" else "Non disponible"
                 }
-                
                 # Boutons du formulaire
                 btn_col1, btn_col2 = st.columns(2)
                 with btn_col1:
@@ -254,12 +328,23 @@ with tabs[0]:
                     
                     # Afficher le message retourné par la méthode
                     if "ajouté" in message:
-                        st.success(message)
+                        # Enregistrer la notification dans le session state
+                        st.session_state.notification = {
+                            "type": "success",
+                            "message": message,
+                            "time": datetime.now()
+                        }
+                        
                         # Fermer le formulaire après un achat réussi
                         st.session_state.show_purchase_form = False
                         st.rerun()
                     else:
-                        st.error(message)
+                        # Enregistrer la notification d'erreur
+                        st.session_state.notification = {
+                            "type": "error",
+                            "message": message,
+                            "time": datetime.now()
+                        }
 
     with col2:
         # Initialiser l'état du formulaire de vente si nécessaire
@@ -271,93 +356,132 @@ with tabs[0]:
             st.session_state.show_sale_form = True
         
         # Afficher le formulaire si l'état est activé
+        
         if st.session_state.show_sale_form:
-            with st.form("vente_vehicule_form"):
-                st.subheader("Formulaire de vente de véhicule")
+        # Initialize vehicle selection outside the form if not already done
+            if "selected_sale_vehicle_id" not in st.session_state:
+                st.session_state.selected_sale_vehicle_id = None
+            
+            # Get vehicles in stock
+            vehicles_in_stock = filtered_data[filtered_data["Statut"] == "En stock"]
+            
+            if len(vehicles_in_stock) == 0:
+                st.warning("Aucun véhicule en stock disponible pour la vente")
+            else:
+                # Vehicle selection outside the form
+                selected_vehicle_id = st.selectbox(
+                    "Sélectionner un véhicule à vendre",
+                    options=vehicles_in_stock["ID"].tolist(),
+                    format_func=lambda x: f"{x} - {vehicles_in_stock[vehicles_in_stock['ID'] == x]['Marque'].iloc[0]} {vehicles_in_stock[vehicles_in_stock['ID'] == x]['Modèle'].iloc[0]}",
+                    key="vehicle_sale_selector"
+                )
                 
-                # Récupérer uniquement les véhicules en stock
-                vehicles_in_stock = filtered_data[filtered_data["Statut"] == "En stock"]
+                # Update session state with selected vehicle ID
+                if st.session_state.selected_sale_vehicle_id != selected_vehicle_id:
+                    st.session_state.selected_sale_vehicle_id = selected_vehicle_id
+                    st.rerun()
                 
-                if len(vehicles_in_stock) == 0:
-                    st.warning("Aucun véhicule en stock disponible pour la vente")
-                    submit_disabled = True
-                else:
-                    # Sélection du véhicule à vendre
-                    selected_vehicle_id = st.selectbox(
-                        "Sélectionner un véhicule à vendre",
-                        options=vehicles_in_stock["ID"].tolist(),
-                        format_func=lambda x: f"{x} - {vehicles_in_stock[vehicles_in_stock['ID'] == x]['Marque'].iloc[0]} {vehicles_in_stock[vehicles_in_stock['ID'] == x]['Modèle'].iloc[0]}"
-                    )
-                    
-                    # Récupérer toutes les informations du véhicule sélectionné
-                    selected_vehicle = vehicles_in_stock[vehicles_in_stock["ID"] == selected_vehicle_id].iloc[0].to_dict()
-                    
-                    # Afficher les détails du véhicule avec une taille de texte réduite
-                    detail_cols = st.columns(3)
-                    with detail_cols[0]:
+                # Get the vehicle details based on the selection
+                selected_vehicle = vehicles_in_stock[vehicles_in_stock["ID"] == selected_vehicle_id].iloc[0].to_dict()
+                
+                # Show vehicle details outside the form
+                st.markdown("### Détails du véhicule")
+                
+                # Create columns for vehicle details
+                detail_cols = st.columns(3)
+                
+                # First column - Basic information
+                with detail_cols[0]:
+                    if "Marque" in selected_vehicle:
                         st.metric("Marque", selected_vehicle["Marque"])
+                    if "Modèle" in selected_vehicle:
                         st.metric("Modèle", selected_vehicle["Modèle"])
-                    
-                    with detail_cols[1]:
+                    if "Catégorie" in selected_vehicle:
+                        st.metric("Catégorie", selected_vehicle["Catégorie"])
+                
+                # Second column - Technical specifications
+                with detail_cols[1]:
+                    if "Année" in selected_vehicle:
                         st.metric("Année", selected_vehicle["Année"])
+                    if "Kilométrage" in selected_vehicle:
                         st.metric("Kilométrage", f"{selected_vehicle['Kilométrage']} km")
-                    
-                    with detail_cols[2]:
+                    if "État" in selected_vehicle:
+                        st.metric("État", selected_vehicle["État"])
+                
+                # Third column - Financial information
+                with detail_cols[2]:
+                    if "Prix d'achat" in selected_vehicle:
                         st.metric("Prix d'achat", f"{selected_vehicle['Prix d\'achat']} €")
+                    if "Prix de vente" in selected_vehicle:
                         st.metric("Prix de vente", f"{selected_vehicle['Prix de vente']} €")
+                    marge = selected_vehicle.get("Prix de vente", 0) - selected_vehicle.get("Prix d'achat", 0)
+                    st.metric("Marge estimée", f"{marge} €")
+                
+                # CSS to reduce metric text size
+                st.markdown("""
+                <style>
+                [data-testid="stMetricValue"] {
+                    font-size: 1rem !important;
+                }
+                [data-testid="stMetricLabel"] {
+                    font-size: 0.8rem !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                # Now the form for the sale process
+                with st.form("vente_vehicule_form"):
+                    st.subheader("Confirmer la vente")
                     
-                    # CSS pour réduire la taille du texte dans les metrics
-                    st.markdown("""
-                    <style>
-                    [data-testid="stMetricValue"] {
-                        font-size: 1rem !important;
-                    }
-                    [data-testid="stMetricLabel"] {
-                        font-size: 0.8rem !important;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
-                    
-                    # Option pour ajuster le prix de vente final
+                    # Option to adjust final sale price
                     final_sale_price = st.number_input(
                         "Prix de vente final (€)",
                         min_value=0,
-                        value=int(selected_vehicle["Prix de vente"]),
+                        value=int(selected_vehicle.get("Prix de vente", 0)),
                         step=1000
                     )
                     
-                    # Mettre à jour le prix de vente
-                    selected_vehicle["Prix de vente"] = final_sale_price
-                    selected_vehicle["Marge"] = final_sale_price - selected_vehicle["Prix d'achat"]
+                    # Update the sale price and margin
+                    selected_vehicle_for_form = selected_vehicle.copy()
+                    selected_vehicle_for_form["Prix de vente"] = final_sale_price
+                    selected_vehicle_for_form["Marge"] = final_sale_price - selected_vehicle_for_form.get("Prix d'achat", 0)
                     
-                    submit_disabled = False
-                
-                # Boutons du formulaire
-                col1, col2 = st.columns(2)
-                with col1:
-                    cancel = st.form_submit_button("Annuler", use_container_width=True)
-                    if cancel:
-                        st.session_state.show_sale_form = False
-                        st.rerun()
+                    # Form buttons
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        cancel = st.form_submit_button("Annuler", use_container_width=True)
+                        if cancel:
+                            st.session_state.show_sale_form = False
+                            st.rerun()
+                    
+                    with col2:
+                        submit = st.form_submit_button("Confirmer la vente", use_container_width=True)
+                    
+                    # Process form submission
+                    if submit:
+                        # Call the ActionVenteAchat method with operation type "vente"
+                        operation = ["vente", ""]
+                        message = algo_actions.ActionVenteAchat(operation, selected_vehicle_for_form)
                         
-                with col2:
-                    submit = st.form_submit_button("Confirmer la vente", disabled=submit_disabled, use_container_width=True)
-                
-                # Traitement après soumission
-                if submit and not submit_disabled:
-                    # Appeler la méthode ActionVenteAchat avec type d'opération "vente"
-                    operation = ["vente", ""]
-                    message = algo_actions.ActionVenteAchat(operation, selected_vehicle)
-                    
-                    # Afficher le message retourné par la méthode
-                    if "retiré" in message:
-                        st.success(message)
-                        # Fermer le formulaire après une vente réussie
-                        st.session_state.show_sale_form = False
-                        st.rerun()
-                    else:
-                        st.error(message)
-    
+                        # Create a more visible notification that persists across reruns
+                        if "retiré" in message:
+                            # Enregistrer la notification dans le session state
+                            st.session_state.notification = {
+                                "type": "success",
+                                "message": message,
+                                "time": datetime.now()
+                            }
+                            
+                            # Close the form after a successful sale
+                            st.session_state.show_sale_form = False
+                            st.rerun()
+                        else:
+                            # Enregistrer la notification d'erreur
+                            st.session_state.notification = {
+                                "type": "error",
+                                "message": message,
+                                "time": datetime.now()
+                            }
     with col3:
         if "show_price_estimation" not in st.session_state:
             st.session_state.show_price_estimation = False
@@ -396,60 +520,63 @@ with tabs[0]:
             
             st.markdown("---")
             
-            col1, col2 = st.columns(2)
-            with col1:
-                cancel = st.button("Annuler", use_container_width=True)
-                if cancel:
-                    st.session_state.show_price_estimation = False
-                    st.rerun()
-            with col2:        
-                if st.button("Calculer l'estimation", use_container_width=True):
-                    try:
-                        estimated_price = st.session_state.price_predictor.predict(
-                            annee, valeur_entree, kilometrage, pieces
-                        )
-                        
-                        # Calculer une fourchette de prix (±5%)
-                        price_min = estimated_price * 0.95
-                        price_max = estimated_price * 1.05
-                        
+            # Use a more logical button layout
+            estimate_btn = st.button("Calculer l'estimation", type="primary", use_container_width=True)
+            cancel_btn = st.button("Annuler", use_container_width=True)
+            
+            if cancel_btn:
+                st.session_state.show_price_estimation = False
+                st.rerun()
+                
+            if estimate_btn:
+                try:
+                    estimated_price = st.session_state.price_predictor.predict(
+                        annee, valeur_entree, kilometrage, pieces
+                    )
+                    
+                    # Calculer une fourchette de prix (±5%)
+                    price_min = estimated_price * 0.95
+                    price_max = estimated_price * 1.05
+                    
+                    # Show results in a nice container with better formatting
+                    with st.container():
                         st.success(f"### Prix estimé: {estimated_price:,.2f} €")
-                        st.info(f"Fourchette de prix recommandée: {price_min:,.2f} € - {price_max:,.2f} €")
-                        
-                        # Afficher quelques métriques supplémentaires
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            marge = estimated_price - valeur_entree
-                            marge_percent = (marge / valeur_entree) * 100 if valeur_entree > 0 else 0
-                            st.metric("Marge potentielle", f"{marge:,.2f} €", f"{marge_percent:.1f}%")
-                        
-                        with col2:
-                            marche_actuel = estimated_price * 0.98  # Simuler prix du marché
-                            diff = estimated_price - marche_actuel
-                            diff_percent = (diff / marche_actuel) * 100
-                            st.metric("Comparaison marché", f"{marche_actuel:,.2f} €", f"{diff_percent:.1f}%")
-                        
-                        with col3:
-                            st.metric("Prix au km", f"{estimated_price / kilometrage:.2f} €/km" if kilometrage > 0 else "N/A")
-                        
-                        # Add CSS to reduce text size in metrics
-                        st.markdown("""
-                        <style>
-                        [data-testid="stMetricValue"] {
-                            font-size: 1rem !important;
-                        }
-                        [data-testid="stMetricDelta"] {
-                            font-size: 0.8rem !important;
-                        }
-                        [data-testid="stMetricLabel"] {
-                            font-size: 0.8rem !important;
-                            font-weight: bold !important;
-                        }
-                        </style>
-                        """, unsafe_allow_html=True)
-                    except Exception as e:
-                        st.error(f"Erreur lors de l'estimation du prix: {str(e)}")
-                        st.error("Veuillez vérifier que le modèle a été correctement entraîné avec les données")
+                        st.info(f"Fourchette recommandée: {price_min:,.2f} € - {price_max:,.2f} €")
+                    
+                    # Organize metrics in a cleaner layout
+                    metric_cols = st.columns(3)
+                    with metric_cols[0]:
+                        marge = estimated_price - valeur_entree
+                        marge_percent = (marge / valeur_entree) * 100 if valeur_entree > 0 else 0
+                        st.metric("Marge potentielle", f"{marge:,.2f} €", f"{marge_percent:.1f}%")
+                    
+                    with metric_cols[1]:
+                        marche_actuel = estimated_price * 0.98  # Simuler prix du marché
+                        diff = estimated_price - marche_actuel
+                        diff_percent = (diff / marche_actuel) * 100
+                        st.metric("Comparaison marché", f"{marche_actuel:,.2f} €", f"{diff_percent:.1f}%")
+                    
+                    with metric_cols[2]:
+                        st.metric("Prix au km", f"{estimated_price / kilometrage:.2f} €/km" if kilometrage > 0 else "N/A")
+                    
+                    # Add CSS to make metrics more compact and readable
+                    st.markdown("""
+                    <style>
+                    [data-testid="stMetricValue"] {
+                        font-size: 1rem !important;
+                    }
+                    [data-testid="stMetricDelta"] {
+                        font-size: 0.8rem !important;
+                    }
+                    [data-testid="stMetricLabel"] {
+                        font-size: 0.8rem !important;
+                        font-weight: bold !important;
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+                except Exception as e:
+                    st.error(f"Erreur lors de l'estimation du prix: {str(e)}")
+                    st.error("Veuillez vérifier que le modèle a été correctement entraîné avec les données")
         
     st.markdown("---")
 
@@ -466,11 +593,9 @@ with tabs[0]:
     
     with col1:
         st.metric("Capacité du parc", f"{Capacite[0]}/140", f"{Capacite[2]:.1f}%")
-        st.progress(Capacite[2]/100)
     
     with col2:
         st.metric("Capacité du showroom", f"{Capacite[1]}/60", f"{Capacite[3]:.1f}%")
-        st.progress(min(Capacite[3]/100, 1.0))
         if Capacite[3] > 100:
             st.warning(f"⚠️ Showroom en surcapacité: {Capacite[3]:.1f}%")
     

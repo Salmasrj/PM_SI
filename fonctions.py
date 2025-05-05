@@ -124,7 +124,6 @@ def calculate_capacity():
     # Capacités maximales
     capacite_max_parc = 140
     capacite_max_showroom = 60
-    
     try:
         # Charger les données du CSV
         df = pd.read_csv("data.csv")
@@ -156,7 +155,7 @@ def get_vehicles_count():
     """
     Calcule le nombre total de véhicules dans la base de données.
     
-    Returns:
+    Sortie:
         int: Nombre total de véhicules
     """
     try:
@@ -175,9 +174,8 @@ NombreVehicules = get_vehicles_count()
 class diagA_Algo_Actions:
     def __init__(self, capacite, nombre_vehicules):
         """
-        Initialise la classe avec les variables globales requises.
-        
-        Args:
+        Objectif : Initialise la classe avec les variables globales requises.
+        Entrée:
             capacite: Liste [nb parc, nb showroom, % parc, % showroom]
             nombre_vehicules: Nombre total de véhicules dans la BDD
         """
@@ -187,17 +185,14 @@ class diagA_Algo_Actions:
     
     def ActionVenteAchat(self, operation, vehicule):
         """
-        Gère les opérations d'achat et de vente de véhicules.
-        
-        Args:
+        Objectif : Gère les opérations d'achat et de vente de véhicules.
+        Entrée:
             operation: Liste [type_operation (achat/vente), type_vehicule (occasion/neuf)]
             vehicule: Dictionnaire représentant une ligne de la BDD
-        
-        Returns:
+        Sortie:
             str: Message de confirmation ou d'erreur
         """
         Message = ""
-        
         # Vérifier si les entrées sont valides
         if operation and vehicule and len(operation) == 2 and isinstance(vehicule, dict):
             # Vérifier le type d'opération (achat/vente)
@@ -206,25 +201,31 @@ class diagA_Algo_Actions:
                 if operation[1].lower() == "occasion":
                     # Vérifier s'il y a de la place dans le parc
                     if self.Capacite[0] < 140:
+                        #pos1 correspond à l'emplacement du véhicule dans le parc
                         pos1 = 0
                         Message = self.CreaMessageModifCapAjout(pos1, vehicule)
                     else:
+                        #pos2 correspond à l'emplacement du vehicule qu'on cherche à ajouter
                         pos2 = "parc"
                         Message = self.PasDespace(pos2)
                 else:  # véhicule neuf
                     # Vérifier s'il y a de la place dans le showroom
                     if self.Capacite[1] < 60:
+                        #pos1 correspond à l'emplacement du véhicule dans le showroom
                         pos1 = 1
                         Message = self.CreaMessageModifCapAjout(pos1, vehicule)
                     else:
+                        #pos2 correspond à l'emplacement du vehicule qu'on cherche à ajouter
                         pos2 = "showroom"
                         Message = self.PasDespace(pos2)
             else:  # vente
                 # Vérifier l'emplacement du véhicule
                 if vehicule.get("Emplacement", "").lower() == "parc":
+                    # pos3 correspond à l'emplacement du véhicule qui va etre retiré
                     pos3 = 0
                     Message = self.SuppressionDuVehicule(pos3, vehicule)
                 else:
+                    # pos3 correspond à l'emplacement du véhicule qui va etre retiré
                     pos3 = 1
                     Message = self.SuppressionDuVehicule(pos3, vehicule)
                 
@@ -238,13 +239,11 @@ class diagA_Algo_Actions:
     
     def CreaMessageModifCapAjout(self, pos1, vehicule):
         """
-        Crée un message, modifie la capacité et ajoute le véhicule à la BDD.
-        
-        Args:
+        Objectif : Crée un message, modifie la capacité et ajoute le véhicule à la BDD.
+        Entrée:
             pos1: Index de l'emplacement (0 pour parc, 1 pour showroom)
             vehicule: Dictionnaire représentant une ligne de la BDD
-        
-        Returns:
+        Sortie:
             str: Message de confirmation
         """
         Message = ""
@@ -278,17 +277,15 @@ class diagA_Algo_Actions:
     
     def PasDespace(self, pos2):
         """
-        Vérifie s'il y a des véhicules qui vont sortir prochainement.
-        
-        Args:
+        Objectif : Vérifie s'il y a des véhicules qui vont sortir prochainement.
+        Entrée:
             pos2: Emplacement ("parc" ou "showroom")
-        
-        Returns:
+        Sortie:
             str: Message d'erreur ou d'information
         """
         Message = f"Erreur pas d'espace dans {pos2}"
         compt = 0
-        
+        # Verifie si un emplacement sera libéré dans la semaine
         try:
             df = pd.read_csv(self.csv_path)
             
@@ -307,13 +304,11 @@ class diagA_Algo_Actions:
     
     def SuppressionDuVehicule(self, pos3, vehicule):
         """
-        Supprime un véhicule de la BDD et met à jour la capacité.
-        
-        Args:
+        Objectif : Supprime un véhicule de la BDD et met à jour la capacité.
+        Entrée:
             pos3: Index de l'emplacement (0 pour parc, 1 pour showroom)
             vehicule: Dictionnaire représentant une ligne de la BDD
-        
-        Returns:
+        Sortie:
             str: Message de confirmation ou d'erreur
         """
         Message = ""
@@ -324,7 +319,7 @@ class diagA_Algo_Actions:
             
             # Rechercher le véhicule par ID
             vehicule_index = df[df["ID"] == vehicule_id].index
-            
+            # Vérifier si le véhicule existe
             if not vehicule_index.empty:
                 # Supprimer le véhicule
                 df = df.drop(vehicule_index)
@@ -336,12 +331,12 @@ class diagA_Algo_Actions:
                     self.Capacite[pos3+2] = self.Capacite[pos3+2] * (self.Capacite[pos3]+1) / self.Capacite[pos3]
                 else:
                     self.Capacite[pos3+2] = 0
-                
+                # Mettre à jour le nombre de véhicules
                 self.NombreVehicules -= 1
                 Message = "Le vehicule a été retiré de la base de données"
         except Exception as e:
             Message = f"Erreur lors de la suppression: {str(e)}"
-        
+
         return Message
 
 
@@ -429,8 +424,7 @@ def estimate_price(price_predictor):
     """
     Affiche un formulaire d'estimation de prix et calcule le prix estimé
     basé sur le modèle de prédiction.
-    
-    Args:
+    Entrée :
         price_predictor: Instance de CarPricePredictor entraînée
     """
     import streamlit as st
